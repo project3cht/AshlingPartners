@@ -3,6 +3,11 @@ import logging
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.exceptions import NotFittedError
+from mtcnn import MTCNN
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
+import io
+import base64
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -12,6 +17,8 @@ app.logger.setLevel(logging.INFO)
 
 # Initialize a simple Random Forest Classifier
 model = RandomForestClassifier(n_estimators=100, random_state=42)
+# Initialize MTCNN model
+detection = MTCNN()
 
 # Sample data for training the model (replace with your actual data)
 X_train = np.random.rand(100, 4)
@@ -56,6 +63,36 @@ def predict():
     except Exception as e:
         app.logger.error(f'Error during prediction: {str(e)}')
         return jsonify({"success": False, "error": "Error during prediction"}), 500
+    
+
+@app.route('/detect_face', methods=['POST'])
+def detect_face():
+    app.logger.info('Face detction endpoint processing HTTP request')
+
+    #Check if image is in request
+    if 'image' not in request.files:
+        app.logger.info('No Image file in the response')
+        return jsonify({"succes": False, "error": "No Image file in the request"}),400
+    
+    #Fetch and Read in image
+    image_file = request.files['image']
+    image = Image.open(image_file)
+    image_np = np.array(image)
+
+    #Find Faces
+    faces = detection.detect_faces(image_np)
+
+    if not faces:
+        app.logger.info('No Faces Detected in the image')
+        return jsonify({"success": True, "message": "No faces Detected in the image"})
+    
+    # Save image to buffer
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    #Encode image to base64
+    img_str = base64.b64encode(buffer.getvalue().decode())
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=50505)
