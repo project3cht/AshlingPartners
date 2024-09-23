@@ -94,5 +94,13 @@ def detect_face():
     #Encode image to base64
     img_str = base64.b64encode(buffer.getvalue().decode())
 
+    #return the image with number of faces
+    app.logger.info(f'Detected {len(faces)} face(s) in the image')
+    return jsonify({
+        "success": True, 
+        "num_faces": len(faces),
+        "image": img_str
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=50505)
