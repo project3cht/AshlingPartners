@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from marshmallow import Schema, fields, ValidationError
 import logging
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -13,7 +14,8 @@ import matplotlib.pyplot as plt
 app = Flask(__name__)
 
 # Set the logger level for Flask's logger
-app.logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize a simple Random Forest Classifier
 model = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -26,43 +28,40 @@ X_train = np.random.rand(100, 4)
 y_train = np.random.randint(0, 2, 100)
 model.fit(X_train, y_train)
 
+#validate input schema
+class FeaturesSchema(Schema):
+    features = fields.List(fields.Float(), required=True, validate=lambda x: len(x) == 4)
+
 @app.route('/')
 def hello():
-    app.logger.info('Main endpoint processing HTTP request')
+    logger.info('Main endpoint processing HTTP request')
     return jsonify({"success":True, "message": "Hello, World!"})
 
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    app.logger.info('Prediction endpoint processing HTTP request')
+    logger.info('Prediction endpoint processing HTTP request')
     
     # Input validation
-    if not request.json or 'features' not in request.json:
-        app.logger.error('Invalid input: missing features')
-        return jsonify({"success": False, "error": "Missing features in input"}), 400
+    schema = FeaturesSchema()
+    try:
+        data = schema.load(request.json)
+    except ValidationError as err:
+        logger.error(f'Invalid input: {err.messages}')
+        return jsonify({"success": False, "error": err.messages}), 400
     
     features = request.json['features']
-    
-    # Ensure features is a list of numbers
-    if not isinstance(features, list) or not all(isinstance(x, (int, float)) for x in features):
-        app.logger.error('Invalid input: features must be a list of numbers')
-        return jsonify({"success": False, "error": "Features must be a list of numbers"}), 400
-    
-    # Ensure correct number of features
-    if len(features) != 4:  # Assuming 4 features based on training data
-        app.logger.error('Invalid input: incorrect number of features')
-        return jsonify({"success": False, "error": "Incorrect number of features"}), 400
     
     try:
         # Make prediction
         prediction = model.predict([features])[0]
-        app.logger.info(f'Prediction made: {prediction}')
-        return jsonify({"success": True, "prediction": int(prediction)})
+        logger.info(f'Prediction made: {prediction}')
+        return jsonify({"success": True, "prediction": int(prediction)}), 200
     except NotFittedError:
-        app.logger.error('Model not fitted')
+        logger.error('Model not fitted')
         return jsonify({"success": False, "error": "Model not fitted"}), 500
     except Exception as e:
-        app.logger.error(f'Error during prediction: {str(e)}')
+        logger.error(f'Error during prediction: {str(e)}')
         return jsonify({"success": False, "error": "Error during prediction"}), 500
     
 #My perosnal laptop does not have enough ram to load cxomputer vision models as well as docker at the same time.
